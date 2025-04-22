@@ -19,57 +19,24 @@ struct Task: Identifiable, Codable {
 }
 
 
-class TaskViewModel: ObservableObject {
-    @Published var tasks: [Task] = []
-    @Published var newTaskTitle: String = ""
-    
-    
-    private let taskKey = "stored_tasks"
-
-    init() {
-        loadTasks()
-    }
-
-    func saveTasks() {
-        if let encoded = try? JSONEncoder().encode(tasks) {
-            UserDefaults.standard.set(encoded, forKey: taskKey)
-        }
-    }
-
-    func loadTasks() {
-        if let data = UserDefaults.standard.data(forKey: taskKey),
-           let decoded = try? JSONDecoder().decode([Task].self, from: data) {
-            self.tasks = decoded
-        }
-    }
-
-
-    func addTask() {
-        let trimmed = newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let task = Task(title: trimmed)
-        tasks.append(task)
-        newTaskTitle = ""
-        saveTasks()
-    }
-
-}
-
-
 struct HomeView: View {
-    @StateObject private var viewModel = TaskViewModel()
+    @Environment(\.managedObjectContext) private var viewContext
+    @FetchRequest(
+        sortDescriptors: [],
+        animation: .default)
+    private var tasks: FetchedResults<TaskEntity>
+
+    @State private var newTaskTitle: String = ""
 
     var body: some View {
         NavigationView {
             VStack {
                 HStack {
-                    TextField("Enter task...", text: $viewModel.newTaskTitle)
+                    TextField("Enter task...", text: $newTaskTitle)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding(.leading)
 
-                    Button(action: {
-                        viewModel.addTask()
-                    }) {
+                    Button(action: addTask) {
                         Image(systemName: "plus.circle.fill")
                             .font(.title)
                     }
@@ -78,12 +45,27 @@ struct HomeView: View {
                 .padding(.vertical)
 
                 List {
-                    ForEach(viewModel.tasks) { task in
-                        Text(task.title)
+                    ForEach(tasks) { task in
+                        Text(task.title ?? "")
                     }
                 }
             }
             .navigationTitle("My Tasks")
+        }
+    }
+
+    private func addTask() {
+        let trimmed = newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let task = TaskEntity(context: viewContext)
+        task.title = trimmed
+        newTaskTitle = ""
+
+        do {
+            try viewContext.save()
+        } catch {
+            print("Error saving: \(error.localizedDescription)")
         }
     }
 }

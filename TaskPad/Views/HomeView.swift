@@ -8,14 +8,41 @@
 import SwiftUI
 import Combine
 
-struct Task: Identifiable {
-    let id = UUID()
+struct Task: Identifiable, Codable {
+    let id: UUID
     let title: String
+
+    init(id: UUID = UUID(), title: String) {
+        self.id = id
+        self.title = title
+    }
 }
+
 
 class TaskViewModel: ObservableObject {
     @Published var tasks: [Task] = []
     @Published var newTaskTitle: String = ""
+    
+    
+    private let taskKey = "stored_tasks"
+
+    init() {
+        loadTasks()
+    }
+
+    func saveTasks() {
+        if let encoded = try? JSONEncoder().encode(tasks) {
+            UserDefaults.standard.set(encoded, forKey: taskKey)
+        }
+    }
+
+    func loadTasks() {
+        if let data = UserDefaults.standard.data(forKey: taskKey),
+           let decoded = try? JSONDecoder().decode([Task].self, from: data) {
+            self.tasks = decoded
+        }
+    }
+
 
     func addTask() {
         let trimmed = newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -23,7 +50,9 @@ class TaskViewModel: ObservableObject {
         let task = Task(title: trimmed)
         tasks.append(task)
         newTaskTitle = ""
+        saveTasks()
     }
+
 }
 
 
